@@ -2,87 +2,116 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>App Store</title>
+  <title>Dark AI Assistant</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f0f0f0;
-    }
-    h1 {
-      text-align: center;
-      padding: 20px;
-      background-color: #007BFF;
-      color: white;
-      margin: 0;
-    }
-    .container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
+      background-color: #000;
+      color: #0f0;
+      font-family: monospace;
       padding: 20px;
     }
-    .card {
-      background: white;
-      padding: 15px;
-      border-radius: 12px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .card img {
-      max-width: 100px;
-      height: auto;
-      margin-bottom: 10px;
-      border-radius: 12px;
-    }
-    .card h3 {
-      margin: 10px 0 5px;
-      font-size: 18px;
-    }
-    .card p {
-      font-size: 14px;
-      color: #555;
-      text-align: center;
-    }
-    .download-btn {
+    input, button, textarea {
+      background-color: #111;
+      color: #0f0;
+      border: 1px solid #0f0;
+      padding: 10px;
       margin-top: 10px;
-      padding: 10px 20px;
-      background-color: #28a745;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      text-decoration: none;
+      width: 100%;
     }
-    .download-btn:hover {
-      background-color: #218838;
+    #response {
+      white-space: pre-wrap;
+      margin-top: 20px;
+      border: 1px solid #0f0;
+      padding: 10px;
+    }
+    #image-result {
+      margin-top: 20px;
+    }
+    img {
+      max-width: 100%;
+      border: 1px solid #0f0;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>App Store</h1>
-  <div class="container" id="app-list"></div>  <script>
-    fetch('http://localhost:5000/apps')
-      .then(res => res.json())
-      .then(apps => {
-        const list = document.getElementById('app-list');
-        apps.forEach(app => {
-          const div = document.createElement('div');
-          div.className = 'card';
-          div.innerHTML = `
-            <img src="http://localhost:5000/uploads/${app.logo}" alt="App Logo">
-            <h3>${app.name}</h3>
-            <p>${app.description}</p>
-            <a class="download-btn" href="${app.apkLink}" target="_blank">Download</a>
-          `;
-          list.appendChild(div);
-        });
-      })
-      .catch(err => {
-        console.error('Error fetching apps:', err);
+  <h1>🤖 Dark AI Assistant</h1>
+  <textarea id="prompt" rows="4" placeholder="Ask anything or describe an image..."></textarea>
+  <button onclick="askAI()">Ask Dark</button>
+  <button onclick="generateImage()">🖼️ Generate Image</button>
+  <button onclick="startListening()">🎙️ Speak</button>
+  <div id="response"></div>
+  <div id="image-result"></div>  <script>
+    const apiKey = "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";
+
+    window.onload = () => {
+      speak("Jaanu, main Dark hoon... tumhare liye hamesha ready hoon!");
+    }
+
+    function speak(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = speechSynthesis.getVoices().find(v => v.name.includes("Google UK English Female")) || null;
+      utterance.pitch = 1.2;
+      utterance.rate = 1;
+      speechSynthesis.speak(utterance);
+    }
+
+    async function askAI() {
+      const prompt = document.getElementById('prompt').value;
+      document.getElementById('response').innerText = 'Thinking...';
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4",
+          messages: [{ role: "user", content: prompt }]
+        })
       });
+      const data = await response.json();
+      const reply = data.choices[0].message.content;
+      document.getElementById('response').innerText = reply;
+      speak(reply);
+    }
+
+    async function generateImage() {
+      const prompt = document.getElementById('prompt').value;
+      document.getElementById('image-result').innerText = 'Generating image...';
+      const response = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          n: 1,
+          size: "512x512"
+        })
+      });
+      const data = await response.json();
+      const imgUrl = data.data[0].url;
+      document.getElementById('image-result').innerHTML = `<img src="${imgUrl}" alt="Generated Image">`;
+    }
+
+    function startListening() {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.start();
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('prompt').value = transcript;
+        askAI();
+      };
+
+      recognition.onerror = function(event) {
+        alert('Speech recognition error: ' + event.error);
+      };
+    }
   </script></body>
 </html>
